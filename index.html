@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Max AI - Robotic Heart</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            background: #000; background: radial-gradient(circle, #200010, #000); 
+            color: #fff; font-family: sans-serif; height: 100vh; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .header { position: absolute; top: 15px; width: 90%; display: flex; justify-content: space-between; color: #ff007f; font-weight: bold; font-size: 12px; }
+        
+        /* Robotic Heart UI */
+        .heart-box { position: relative; width: 200px; height: 200px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .heart-svg { width: 120px; fill: #ff007f; filter: drop-shadow(0 0 15px #ff007f); transition: 0.3s; }
+        .active .heart-svg { animation: beat 0.8s infinite alternate; filter: drop-shadow(0 0 30px #ff00ff); }
+        @keyframes beat { to { transform: scale(1.2); } }
+
+        #max-status { margin-top: 30px; color: #ff007f; font-size: 22px; text-align: center; min-height: 30px; text-shadow: 0 0 10px #ff007f; }
+        #user-speech { margin-top: 10px; color: #ff99cc; font-size: 15px; opacity: 0.7; text-align: center; }
+        #timer { margin-top: 10px; font-size: 12px; color: #444; }
+        .footer { position: absolute; bottom: 20px; color: rgba(255,0,127,0.4); letter-spacing: 3px; font-size: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div id="tm">TIME: --:--</div>
+        <div id="bt">BATT: --%</div>
+    </div>
+
+    <div class="heart-box" id="mainCore" onclick="startMax()">
+        <svg class="heart-svg" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+    </div>
+
+    <h1 id="max-status">SYSTEM STANDBY</h1>
+    <p id="user-speech"></p>
+    <div id="timer"></div>
+    <div class="footer">BUILD BY <b>ARYAN</b></div>
+
+    <script>
+        const statusH1 = document.getElementById('max-status');
+        const speechP = document.getElementById('user-speech');
+        const core = document.getElementById('mainCore');
+        const timerDiv = document.getElementById('timer');
+
+        let active = false;
+        let tLeft = 120;
+        let tInterval;
+
+        // Battery & Time
+        function updateStats() {
+            const d = new Date();
+            document.getElementById('tm').innerText = "TIME: " + d.getHours() + ":" + d.getMinutes().toString().padStart(2, '0');
+            if (navigator.getBattery) navigator.getBattery().then(b => {
+                document.getElementById('bt').innerText = "BATT: " + Math.round(b.level * 100) + "%";
+            });
+        }
+        setInterval(updateStats, 1000); updateStats();
+
+        // Voice Engine
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'en-US';
+
+        function speak(text) {
+            window.speechSynthesis.cancel();
+            const msg = new SpeechSynthesisUtterance(text);
+            msg.onend = () => { if(active) recognition.start(); };
+            window.speechSynthesis.speak(msg);
+            statusH1.innerText = text;
+        }
+
+        function startMax() {
+            if(!active) {
+                active = true;
+                core.classList.add('active');
+                speak("Hello Sir, Max is online. How can I help you?");
+                startTimer();
+            } else {
+                active = false;
+                core.classList.remove('active');
+                recognition.stop();
+                clearInterval(tInterval);
+                statusH1.innerText = "SYSTEM STANDBY";
+                timerDiv.innerText = "";
+            }
+        }
+
+        function startTimer() {
+            clearInterval(tInterval); tLeft = 120;
+            tInterval = setInterval(() => {
+                tLeft--;
+                timerDiv.innerText = "AUTO-SLEEP: " + tLeft + "s";
+                if(tLeft <= 0) startMax();
+            }, 1000);
+        }
+
+        recognition.onresult = (e) => {
+            const cmd = e.results[0][0].transcript.toLowerCase();
+            speechP.innerText = "You: " + cmd;
+            tLeft = 120; // Reset timer on speech
+            handle(cmd);
+        };
+
+        recognition.onend = () => { if(active && !window.speechSynthesis.speaking) recognition.start(); };
+
+        function handle(cmd) {
+            if(cmd.includes("light on")) { speak("Light on, Sir."); toggleL(true); }
+            else if(cmd.includes("light off")) { speak("Light off, Sir."); toggleL(false); }
+            else if(cmd.includes("youtube")) { speak("Opening YouTube."); window.open("https://youtube.com"); }
+            else if(cmd.includes("whatsapp")) { speak("Opening WhatsApp."); window.location.href="whatsapp://send"; }
+            else if(cmd.includes("who are you")) speak("I am Max, your personal AI assistant, built by Aryan Sir.");
+            else if(cmd.includes("hello")) speak("Hello Sir! Ready for your orders.");
+            else {
+                speak("Searching for " + cmd + " for you, Sir.");
+                setTimeout(()=> window.open("https://google.com/search?q="+cmd), 2000);
+            }
+        }
+
+        async function toggleL(s) {
+            try {
+                const st = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+                const tk = st.getVideoTracks()[0];
+                await tk.applyConstraints({advanced:[{torch:s}]});
+                if(!s) tk.stop();
+            } catch(e) { speak("Sir, camera permission is needed."); }
+        }
+    </script>
+</body>
+</html>
